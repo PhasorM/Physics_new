@@ -1,35 +1,42 @@
 #include "quadtree.h"
-
+// constructor 
 QuadTreeAllocator::QuadTreeAllocator(int maxNodes) {
     pool.resize(maxNodes); 
     nextAvailable = 0;
 }
+// QuadTree::QuadTree() {
+//     boundary = {0, 0, 0, 0};
+//     //capacity = cap;
+//     allocator = nullptr;
+//     currentPointCount = 0;
+//     divided = false;
+// }
 
+// Reset the allocator to reuse all nodes
 void QuadTreeAllocator::reset() {
     nextAvailable = 0;
 }
 
+// Allocate a new QuadTree node from the pool
 QuadTree* QuadTreeAllocator::allocate(Boundary b, int cap) {
-    if (nextAvailable >= pool.size()) {
-        pool.resize(pool.size() * 2); 
-    }
+    // if (nextAvailable >= pool.size()) {
+    //     pool.resize(pool.size() * 2); 
+    // }
     
-    // Grab the next node and reset its data
+    // // Grab the next node and reset its data
     QuadTree* node = &pool[nextAvailable++];
-    node->reset(b, cap, this);
+    node->qtreset(b, cap, this);
     return node;
 }
 
 
-QuadTree::QuadTree(Boundary b, int cap, QuadTreeAllocator* alloc) {
-    reset(b, cap, alloc);
-}
 
-void QuadTree::reset(Boundary b, int cap, QuadTreeAllocator* alloc) {
+// Reset the QuadTree node with default boundary, capacity, and allocator
+void QuadTree::qtreset(Boundary b, int cap, QuadTreeAllocator* alloc) {
     boundary = b;
-    capacity = cap;
+    //capacity = cap;
     allocator = alloc;
-    points.clear();
+    currentPointCount = 0;
     divided = false;
     northwest = nullptr;
     northeast = nullptr;
@@ -47,21 +54,28 @@ void QuadTree::subdivide() {
     Boundary ne = {x + w/2, y - h/2, w/2, h/2};
     Boundary sw = {x - w/2, y + h/2, w/2, h/2};
     Boundary se = {x + w/2, y + h/2, w/2, h/2};
+    // allocator is a POINTER to the QuadTreeAllocator that manages the pool of quadtrees, so we can call allocate to get new nodes for each quadrant
+    northwest = allocator->allocate(nw, 4); // -> is used to access the node pointer returned by the allocator as a pointer
+    southwest = allocator->allocate(sw, 4);
+    southeast = allocator->allocate(se, 4);
+    northeast = allocator->allocate(ne, 4);
 
-    northwest = allocator->allocate(nw, capacity);
-    northeast = allocator->allocate(ne, capacity);
-    southwest = allocator->allocate(sw, capacity);
-    southeast = allocator->allocate(se, capacity);
-
+    for (int i = 0; i < currentPointCount; i++) {
+        if (northwest->insert(points[i])) continue;
+        if (northeast->insert(points[i])) continue;
+        if (southwest->insert(points[i])) continue;
+        if (southeast->insert(points[i])) continue;
+    }
+    currentPointCount = 0; // Clear points from parent node after subdivision
     divided = true;
 }
 
 bool QuadTree::insert(Point p) {
     if (!boundary.contains(p)) return false;
 
-    if (points.size() < capacity && !divided) {
-        points.push_back(p);
-        return true;
+    if (currentPointCount < 4 && !divided) {
+        points[currentPointCount++] = p;
+        return true; 
     }
 
     if (!divided) subdivide();
@@ -74,29 +88,22 @@ bool QuadTree::insert(Point p) {
     return false;
 }
 
-std::vector<Point> QuadTree::query(Boundary range) {
-    std::vector<Point> found;
-    if (!boundary.intersects(range)) return found;
+void QuadTree::query(Boundary range , std::vector<Point>& found) {
+    if (!boundary.intersects(range)) return; 
 
-    for (const auto& p : points) {
-        if (range.contains(p)) found.push_back(p);
+    for (int i = 0; i <currentPointCount; i++) {
+        if (range.contains(points[i])){
+            found.push_back(points[i]);
+        }
     }
-
     if (divided) {
-        auto nwFound = northwest->query(range);
-        found.insert(found.end(), nwFound.begin(), nwFound.end());
-        
-        auto neFound = northeast->query(range);
-        found.insert(found.end(), neFound.begin(), neFound.end());
-        
-        auto swFound = southwest->query(range);
-        found.insert(found.end(), swFound.begin(), swFound.end());
-        
-        auto seFound = southeast->query(range);
-        found.insert(found.end(), seFound.begin(), seFound.end());
+        northwest -> query (range, found);
+        northeast -> query (range, found);
+        southwest -> query (range, found);
+        southeast -> query (range, found);
     }
-
-    return found;
+    
+    return;
 }
 
 void QuadTree::show() {

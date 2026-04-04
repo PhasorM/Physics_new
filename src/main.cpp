@@ -7,10 +7,14 @@ int main() {
     // 1. Initialize a window (800x600 resolution)
     InitWindow(800, 600, "Custom C++ Physics Engine");
     SetTargetFPS(60);
+
+
     
     //test the rendering and SIMD math
     
     ObjectManager manager;
+    std::vector<int> found;
+    found.reserve(2000);
     for (int i = 0; i < 10001; i++){
         manager.AddObject(
             (float)(rand() % 800), // x
@@ -18,7 +22,7 @@ int main() {
             (float)(rand() % 200 - 100) / 1.0f, // vx
             (float)(rand() % 200 - 100) / 1.0f, // vy
             0.0f, // ax
-            0.0f, // ay
+            100.0f, // ay
             1.0f, // mass
             1.0f, // radius
             (float)(rand() % 100) / 100.0f  // restitution
